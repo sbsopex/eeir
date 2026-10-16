@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "SBS eEIR Auto Detect Bridge",
+  "version": "1.0.0",
+  "description": "Menjalankan pencarian eEIR dari dashboard GitHub Pages menggunakan sesi login manual di Chrome.",
+  "permissions": ["tabs", "scripting", "storage"],
+  "host_permissions": ["https://maersk.sbs-icd.com/*"],
+  "content_scripts": [{"matches": ["https://*.github.io/*"], "js": ["bridge.js"], "run_at": "document_start"}],
+  "background": {"service_worker": "background.js"},
+  "action": {"default_popup": "popup.html"}
+}
