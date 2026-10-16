@@ -1,5 +1,5 @@
 const $=s=>document.querySelector(s), CHANNEL='SBS_EEIR_V1';
-const FIELDS=['Container','Owner','Size','Type','Grade','Condition', 'Block Remark','equipmentOwnershipType','leasingContractNo','redeliveryLocation1','redeliveryLocation2','redeliveryLocation3','globalHuntStatus','globalHuntRedeliveryLocation','Status','Error'];
+const FIELDS=['Container','Owner','Size','Type','Grade','Condition', 'Duration', 'Block Remark','equipmentOwnershipType','leasingContractNo','redeliveryLocation1','redeliveryLocation2','redeliveryLocation3','globalHuntStatus','globalHuntRedeliveryLocation','Status','Error'];
 let stock=[],results=[],running=false,stopRequested=false;
 $('#headers').innerHTML=FIELDS.map(x=>`<th>${x}</th>`).join('');
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
@@ -20,7 +20,7 @@ function field(node,target){
  return '';
 }
 function unwrap(d){ if(typeof d==='string'){try{return unwrap(JSON.parse(d))}catch{return d}}if(d&&typeof d==='object'&&Object.keys(d).length===1&&'d'in d)return unwrap(d.d);return d }
-function toResult(s,res){const row={Container:s.Container,Owner:s.Owner,Size:s.Size,Type:s.Type,Condition:s.Condition,Grade:s.Grade,'Block Remark':s['Block Remark'],Status:'ERROR',Error:''};
+function toResult(s,res){const row={Container:s.Container,Owner:s.Owner,Size:s.Size,Type:s.Type,Condition:s.Condition,Grade:s.Grade,Duration:s.Duration,'Block Remark':s['Block Remark'],Status:'ERROR',Error:''};
  if(!res.ok){row.Error=res.error||'Gagal mencari';return row}
  const json=unwrap(res.data);const success=field(json,'success'), result=field(json,'result');
  if(String(success).toLowerCase()==='false'||String(result).toUpperCase()==='FAILED'){row.Status='NOT_FOUND';row.Error=field(json,'message')||'eEIR mengembalikan kegagalan';return row}
@@ -41,7 +41,7 @@ $('#file').onchange=async e=>{try{
  const w=XLSX.read(await f.arrayBuffer(),{type:'array',cellDates:true});const sheet=w.Sheets[w.SheetNames[0]];
  const raw=XLSX.utils.sheet_to_json(sheet,{defval:'',raw:false});const seen=new Set();stock=[];
  for(const r of raw){const cont=normalize(pick(r,'Cont','Container','Container Number'));if(!/^[A-Z]{4}\d{7}$/.test(cont)||seen.has(cont))continue;seen.add(cont);
- stock.push({Container:cont,Owner:pick(r,'Owner').toUpperCase()||'UNKNOWN',Size:pick(r,'Size'),Type:pick(r,'Type'),Condition:pick(r,'Condition'),Grade:pick(r,'Grade'),'Block Remark':pick(r,'Block Remark')});}
+ stock.push({Container:cont,Owner:pick(r,'Owner').toUpperCase()||'UNKNOWN',Size:pick(r,'Size'),Type:pick(r,'Type'),Condition:pick(r,'Condition'),Grade:pick(r,'Grade'),Duration:pick(r,'Duration')'Block Remark':pick(r,'Block Remark')});}
  if(!stock.length)throw Error('Kolom Cont tidak ditemukan atau tidak ada nomor container valid');results=[];update();$('#runstatus').textContent='Stock berhasil dimuat. Login di tab eEIR, lalu jalankan uji 5 container.';
  }catch(err){$('#stockstatus').textContent='Error: '+err.message}};
 $('#connect').onclick=async()=>{const r=await send('PING');$('#connection').textContent=r.ok?(r.tabReady?'Ekstensi terhubung; tab eEIR tersedia. Pastikan sudah login.':'Ekstensi terhubung. Buka tab eEIR dan login manual.'):'Belum terhubung: '+r.error;$('#connection').classList.toggle('warn',!r.ok)};
