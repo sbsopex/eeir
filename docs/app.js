@@ -41,7 +41,7 @@ $('#file').onchange=async e=>{try{
  const w=XLSX.read(await f.arrayBuffer(),{type:'array',cellDates:true});const sheet=w.Sheets[w.SheetNames[0]];
  const raw=XLSX.utils.sheet_to_json(sheet,{defval:'',raw:false});const seen=new Set();stock=[];
  for(const r of raw){const cont=normalize(pick(r,'Cont','Container','Container Number'));if(!/^[A-Z]{4}\d{7}$/.test(cont)||seen.has(cont))continue;seen.add(cont);
- stock.push({Container:cont,Owner:pick(r,'Owner').toUpperCase()||'UNKNOWN',Size:pick(r,'Size'),Type:pick(r,'Type'),Condition:pick(r,'Condition'),Grade:pick(r,'Grade'),Duration:pick(r,'Duration')'Block Remark':pick(r,'Block Remark')});}
+ stock.push({Container:cont,Owner:pick(r,'Owner').toUpperCase()||'UNKNOWN',Size:pick(r,'Size'),Type:pick(r,'Type'),Condition:pick(r,'Condition'),Grade:pick(r,'Grade'),Duration:pick(r,'Duration'),'Block Remark':pick(r,'Block Remark')});}
  if(!stock.length)throw Error('Kolom Cont tidak ditemukan atau tidak ada nomor container valid');results=[];update();$('#runstatus').textContent='Stock berhasil dimuat. Login di tab eEIR, lalu jalankan uji 5 container.';
  }catch(err){$('#stockstatus').textContent='Error: '+err.message}};
 $('#connect').onclick=async()=>{const r=await send('PING');$('#connection').textContent=r.ok?(r.tabReady?'Ekstensi terhubung; tab eEIR tersedia. Pastikan sudah login.':'Ekstensi terhubung. Buka tab eEIR dan login manual.'):'Belum terhubung: '+r.error;$('#connection').classList.toggle('warn',!r.ok)};
@@ -60,3 +60,35 @@ $('#download').onclick=()=>{if(!results.length)return;
  const book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,sheet,'EEIR Results');
  XLSX.writeFile(book,`SBS_EEIR_${new Date().toISOString().slice(0,10)}.xlsx`);
 };
+
+// Lookup satu container langsung dari dashboard tanpa file stock.
+const manualInput = $('#manualContainer');
+const manualBtn = $('#manualSearch');
+const manualStatus = $('#manualStatus');
+const manualResults = $('#manualResults');
+function showManual(row){
+ const details = FIELDS.filter(k => !['Status','Error'].includes(k));
+ manualResults.innerHTML = `<div class="manual-result-head"><b>${escapeHtml(row.Container)}</b> <span class="result-state">${escapeHtml(row.Status)}</span></div>` +
+ (row.Error ? `<p class="warn-text">${escapeHtml(row.Error)}</p>` : '') +
+ `<div class="manual-grid">${details.map(k=>`<div><small>${escapeHtml(k)}</small><strong>${escapeHtml(text(row[k])||'—')}</strong></div>`).join('')}</div>`;
+ manualResults.classList.remove('hidden');
+}
+manualBtn.onclick=async()=>{
+ if (running || manualBtn.disabled) return;
+ const cont=normalize(manualInput.value);
+ if (!/^[A-Z]{4}\d{7}$/.test(cont)){
+  manualStatus.textContent='Masukkan nomor container yang valid: 4 huruf + 7 angka (contoh MSKU1234567).';return;
+ }
+ manualInput.value=cont;manualBtn.disabled=true;
+ manualStatus.textContent=`Mencari ${cont} melalui ekstensi...`;
+ try{
+  const source=stock.find(s=>s.Container===cont)||{Container:cont,Owner:'',Size:'',Type:'',Grade:'',Condition:'',Duration:'','Block Remark':''};
+  const res=await send('LOOKUP',cont);const row=toResult(source,res);
+  const idx=results.findIndex(r=>r.Container===cont);
+  if(idx>=0)results[idx]=row;else results.push(row);
+  render();showManual(row);
+  manualStatus.textContent=row.Status==='MATCHED'?`Selesai: ${cont} berhasil dibaca.`:`${cont}: ${row.Status} — ${row.Error||'Tidak ada detail'}`;
+ }catch(err){manualStatus.textContent='Gagal: '+String(err.message||err)}
+ finally{manualBtn.disabled=false}
+};
+manualInput.addEventListener('keydown',e=>{if(e.key==='Enter')manualBtn.click()});
